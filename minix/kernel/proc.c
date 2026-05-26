@@ -1782,22 +1782,22 @@ void dequeue(struct proc *rp)
 /*===========================================================================*
  *				pick_proc				     * 
  *===========================================================================*/
-static struct proc * pick_proc ( void )
- {
-	struct proc * rp ;
-	int q ;
-	struct proc ** rdy_head ;
+static struct proc *pick_proc(void)
+{
+    struct proc *rp;
+    int q;
+    struct proc **rdy_head;
 
-	rdy_head = get_cpulocal_var ( run_q_head ) ;
+    rdy_head = get_cpulocal_var(run_q_head);
 
-	for ( q = 0; q < NR_SCHED_QUEUES ; q ++) {
-		if (( rp = rdy_head [ q ]) != NULL ) {
-		return rp ;
-		}
-	}
+    for (q = 0; q < NR_SCHED_QUEUES; q++) {
+        if ((rp = rdy_head[q]) != NULL) {
+            return rp;
+        }
+    }
 
-	return NULL ;
- }
+    return NULL;
+}
 
 /*===========================================================================*
  *				endpoint_lookup				     *
