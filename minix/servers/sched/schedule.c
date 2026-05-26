@@ -137,159 +137,106 @@ int do_stop_scheduling(message *m_ptr)
 /*===========================================================================*
  *				do_start_scheduling			     *
  *===========================================================================*/
-int do_start_scheduling(message *m_ptr)
-{
-	register struct schedproc *rmp;
-	int rv, proc_nr_n, parent_nr_n;
-	
-	/* we can handle two kinds of messages here */
-	assert(m_ptr->m_type == SCHEDULING_START || 
-		m_ptr->m_type == SCHEDULING_INHERIT);
+ int do_start_scheduling ( message * m_ptr )
+ {
+	register struct schedproc * rmp ;
+	int rv , proc_nr_n , parent_nr_n ;
 
-	/* check who can send you requests */
-	if (!accept_message(m_ptr))
-		return EPERM;
+	assert ( m_ptr - > m_type == SCHEDULING_START ||
+		m_ptr - > m_type == SCHEDULING_INHERIT ) ;
 
-	/* Resolve endpoint to proc slot. */
-	if ((rv = sched_isemtyendpt(m_ptr->m_lsys_sched_scheduling_start.endpoint,
-			&proc_nr_n)) != OK) {
-		return rv;
+	if (! accept_message ( m_ptr ) )
+		return EPERM ;
+
+	if (( rv = sched_isemtyendpt ( m_ptr - > m_ l sy s _s c he d _s c he d ul i ng _ st a rt . endpoint ,
+	& proc_nr_n ) ) != OK ) {
+		return rv ;
 	}
-	rmp = &schedproc[proc_nr_n];
+	rmp = & schedproc [ proc_nr_n ];
 
-	/* Populate process slot */
-	rmp->endpoint     = m_ptr->m_lsys_sched_scheduling_start.endpoint;
-	rmp->parent       = m_ptr->m_lsys_sched_scheduling_start.parent;
-	rmp->max_priority = m_ptr->m_lsys_sched_scheduling_start.maxprio;
-	if (rmp->max_priority >= NR_SCHED_QUEUES) {
-		return EINVAL;
-	}
+	rmp - > endpoint = m_ptr - > m _l s ys _ sc h ed _ sc h ed u li n g_ s ta r t . endpoint ;
+	rmp - > parent = m_ptr - > m_ l sy s _s c he d _s c he d ul i ng _ st a rt . parent ;
 
-	/* Inherit current priority and time slice from parent. Since there
-	 * is currently only one scheduler scheduling the whole system, this
-	 * value is local and we assert that the parent endpoint is valid */
-	if (rmp->endpoint == rmp->parent) {
-		/* We have a special case here for init, which is the first
-		   process scheduled, and the parent of itself. */
-		rmp->priority   = USER_Q;
-		rmp->time_slice = DEFAULT_USER_TIME_SLICE;
+	// M O D I F I C A O : Prioridade m x i m a fixada em USER_Q
+	rmp - > max_priority = USER_Q ;29
 
-		/*
-		 * Since kernel never changes the cpu of a process, all are
-		 * started on the BSP and the userspace scheduling hasn't
-		 * changed that yet either, we can be sure that BSP is the
-		 * processor where the processes run now.
-		 */
-#ifdef CONFIG_SMP
-		rmp->cpu = machine.bsp_id;
-		/* FIXME set the cpu mask */
-#endif
-	}
-	
-	switch (m_ptr->m_type) {
-
-	case SCHEDULING_START:
-		/* We have a special case here for system processes, for which
-		 * quanum and priority are set explicitly rather than inherited 
-		 * from the parent */
-		rmp->priority   = rmp->max_priority;
-		rmp->time_slice = m_ptr->m_lsys_sched_scheduling_start.quantum;
-		break;
-		
-	case SCHEDULING_INHERIT:
-		/* Inherit current priority and time slice from parent. Since there
-		 * is currently only one scheduler scheduling the whole system, this
-		 * value is local and we assert that the parent endpoint is valid */
-		if ((rv = sched_isokendpt(m_ptr->m_lsys_sched_scheduling_start.parent,
-				&parent_nr_n)) != OK)
-			return rv;
-
-		rmp->priority = schedproc[parent_nr_n].priority;
-		rmp->time_slice = schedproc[parent_nr_n].time_slice;
-		break;
-		
-	default: 
-		/* not reachable */
-		assert(0);
+	if ( rmp - > max_priority >= NR_SCHED_QUEUES ) {
+		return EINVAL ;
 	}
 
-	/* Take over scheduling the process. The kernel reply message populates
-	 * the processes current priority and its time slice */
-	if ((rv = sys_schedctl(0, rmp->endpoint, 0, 0, 0)) != OK) {
-		printf("Sched: Error taking over scheduling for %d, kernel said %d\n",
-			rmp->endpoint, rv);
-		return rv;
+	if ( rmp - > endpoint == rmp - > parent ) {
+		// M O D I F I C A O : Prioridade de ’ init ’ fixada em USER_Q
+		rmp - > priority = USER_Q ;
+		rmp - > time_slice = DEFAULT_USER_TIME_SLICE ;
+		# ifdef CONFIG_SMP
+		rmp - > cpu = machine . bsp_id ;
+		# endif
 	}
-	rmp->flags = IN_USE;
-
-	/* Schedule the process, giving it some quantum */
-	pick_cpu(rmp);
-	while ((rv = schedule_process(rmp, SCHEDULE_CHANGE_ALL)) == EBADCPU) {
-		/* don't try this CPU ever again */
-		cpu_proc[rmp->cpu] = CPU_DEAD;
-		pick_cpu(rmp);
+	switch ( m_ptr - > m_type ) {
+	case SCHEDULING_START :
+	// M O D I F I C A O : Prioridade fixada em USER_Q
+	rmp - > priority = USER_Q ;
+	rmp - > time_slice = m_ptr - > m _ ls y s_ s ch e d_ s ch e du l in g _s t ar t . quantum ;
+	break ;
+	case SCHEDULING_INHERIT :
+	if (( rv = sched_isokendpt ( m_ptr - > m _ ls y s_ s ch e d_ s ch e du l in g _s t ar t . parent ,
+	& parent_nr_n ) ) != OK )
+	return rv ;
+	// M O D I F I C A O : Prioridade herdada fixada em USER_Q
+	rmp - > priority = USER_Q ;
+	rmp - > time_slice = schedproc [ parent_nr_n ]. time_slice ;
+	break ;
+	default :
+	assert (0) ;
 	}
-
-	if (rv != OK) {
-		printf("Sched: Error while scheduling process, kernel replied %d\n",
-			rv);
-		return rv;
+	if (( rv = sys_schedctl (0 , rmp - > endpoint , 0 , 0 , 0) ) != OK ) {
+		printf ( " Sched : Error taking over scheduling for %d , kernel said % d \ n " ,
+		rmp - > endpoint , rv ) ;
+		return rv ;
 	}
-
-	/* Mark ourselves as the new scheduler.
-	 * By default, processes are scheduled by the parents scheduler. In case
-	 * this scheduler would want to delegate scheduling to another
-	 * scheduler, it could do so and then write the endpoint of that
-	 * scheduler into the "scheduler" field.
-	 */
-
-	m_ptr->m_sched_lsys_scheduling_start.scheduler = SCHED_PROC_NR;
-
-	return OK;
+		rmp - > flags = IN_USE ;
+		pick_cpu ( rmp ) ;
+	while (( rv = schedule_process ( rmp , SCHEDULE_CHANGE_ALL ) ) == EBADCPU ) {
+		cpu_proc [ rmp - > cpu ] = CPU_DEAD ;
+		pick_cpu ( rmp ) ;
+	}
+	if ( rv != OK ) {
+		printf ( " Sched : Error while scheduling process , kernel replied % d \ n " ,
+			rv ) ;
+		return rv ;
+	}
+	m_ptr - > m _s c he d _l s ys _ sc h ed u li n g_ s ta r t . scheduler = SCHED_PROC_NR ;
+	return OK ;
 }
 
 /*===========================================================================*
  *				do_nice					     *
  *===========================================================================*/
-int do_nice(message *m_ptr)
+int do_nice ( message * m_ptr )
 {
-	struct schedproc *rmp;
-	int rv;
-	int proc_nr_n;
-	unsigned new_q, old_q, old_max_q;
+	struct schedproc * rmp ;
+	int rv ;
+	int proc_nr_n ;
+	if (! accept_message ( m_ptr ) )
+		return EPERM ;
+	if ( sched_isokendpt ( m_ptr - > m_ p m _ sc h e d_ s c h ed u l in g _ s et _ n ic e . endpoint , & proc_nr_n ) != OK) 
+	{
+		printf ( " SCHED : WARNING : got an invalid endpoint in OoQ msg "
+		" % d \ n " , m_ptr - > m _ p m_ s c he d _ s ch e d ul i n g _s e t _n i c e . endpoint ) ;
+		return EBADEPT ;
+ 	}
 
-	/* check who can send you requests */
-	if (!accept_message(m_ptr))
-		return EPERM;
+	rmp = & schedproc [ proc_nr_n ];
+	// valor recebido
 
-	if (sched_isokendpt(m_ptr->m_pm_sched_scheduling_set_nice.endpoint, &proc_nr_n) != OK) {
-		printf("SCHED: WARNING: got an invalid endpoint in OoQ msg "
-		"%d\n", m_ptr->m_pm_sched_scheduling_set_nice.endpoint);
-		return EBADEPT;
-	}
+	// M O D I F I C A O : Prioridade e prioridade m x i m a s o fixadas em USER_Q , ignorando o
+	rmp - > priority = USER_Q ;
+	rmp - > max_priority = USER_Q ;
 
-	rmp = &schedproc[proc_nr_n];
-	new_q = m_ptr->m_pm_sched_scheduling_set_nice.maxprio;
-	if (new_q >= NR_SCHED_QUEUES) {
-		return EINVAL;
-	}
+	// A l g i c a de rollback foi removida por n o ser mais n e c e s s r i a
 
-	/* Store old values, in case we need to roll back the changes */
-	old_q     = rmp->priority;
-	old_max_q = rmp->max_priority;
-
-	/* Update the proc entry and reschedule the process */
-	rmp->max_priority = rmp->priority = new_q;
-
-	if ((rv = schedule_process_local(rmp)) != OK) {
-		/* Something went wrong when rescheduling the process, roll
-		 * back the changes to proc struct */
-		rmp->priority     = old_q;
-		rmp->max_priority = old_max_q;
-	}
-
-	return rv;
-}
+	return s chedule_process_local ( rmp ) ;
+ }
 
 /*===========================================================================*
  *				schedule_process			     *
